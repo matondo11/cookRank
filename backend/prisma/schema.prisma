@@ -11,3 +11,241 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+
+
+//////////////////////////
+// ENUMS (🔥 EVITA ERROS)
+//////////////////////////
+
+enum RecipeSource {
+  user
+  external
+}
+
+enum SubmissionStatus {
+  pending
+  processed
+}
+
+enum Visibility {
+  private
+  public
+}
+
+enum NotificationType {
+  follow
+  like
+  comment
+
+  // 🔥 SISTEMA
+  system
+  ai_result
+  fraud_alert
+  badge
+}
+
+//////////////////////////
+// 👤 USER
+//////////////////////////
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  avatar    String?
+  createdAt DateTime @default(now())
+
+  // 🔥 CONTADORES (performance)
+  followersCount Int @default(0)
+  followingCount Int @default(0)
+
+  // RELAÇÕES
+  recipes        Recipe[]
+  submissions    RecipeSubmission[]
+  comments       Comment[]
+  likes          Like[]
+
+  followers      Follow[] @relation("followers")
+  following      Follow[] @relation("following")
+
+  notifications       Notification[] @relation("UserNotifications")
+  sentNotifications   Notification[] @relation("NotificationSender")
+
+  @@index([email])
+}
+
+//////////////////////////
+// 🔗 FOLLOW
+//////////////////////////
+
+model Follow {
+  id String @id @default(uuid())
+
+  followerId  String
+  followingId String
+
+  follower  User @relation("following", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([followerId, followingId])
+}
+
+//////////////////////////
+// 🔔 NOTIFICAÇÕES (CORRIGIDO)
+//////////////////////////
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  content   String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  // 👤 quem recebe
+  userId String
+  user   User @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  // 👤 quem gerou (pode ser null = sistema)
+  senderId String?
+  sender  User? @relation("NotificationSender", fields: [senderId], references: [id])
+
+  // 🔗 contexto (opcional)
+  submissionId String?
+  submission   RecipeSubmission? @relation(fields: [submissionId], references: [id])
+
+  // 🧠 FLAG IMPORTANTE
+  isSystem Boolean @default(false)
+
+  @@index([userId])
+  @@index([read])
+  @@index([isSystem])
+}
+//////////////////////////
+// 🍲 RECIPE
+//////////////////////////
+
+model Recipe {
+  id          String        @id @default(uuid())
+  title       String
+  description String?
+  imageUrl    String?
+  category    String?
+  difficulty  String?
+
+  source      RecipeSource
+  externalId  String?
+  cachedAt    DateTime?
+
+  createdAt   DateTime @default(now())
+
+  userId String?
+  user   User? @relation(fields: [userId], references: [id])
+
+  ingredients Ingredient[]
+  steps       Step[]
+  submissions RecipeSubmission[]
+
+  @@index([title])
+  @@index([externalId])
+}
+
+//////////////////////////
+// 🥕 INGREDIENTES
+//////////////////////////
+
+model Ingredient {
+  id       String @id @default(uuid())
+  name     String
+  quantity String?
+
+  recipeId String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+}
+
+//////////////////////////
+// 🧾 PASSOS (FIX)
+//////////////////////////
+
+model Step {
+  id       String @id @default(uuid())
+  order    Int
+  content  String
+
+  recipeId String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, order]) // 🔥 evita duplicação
+}
+
+//////////////////////////
+// 📸 SUBMISSÃO
+//////////////////////////
+
+model RecipeSubmission {
+  id        String           @id @default(uuid())
+  imageUrl  String
+
+  score     Float?
+  feedback  String?
+  isFraud   Boolean          @default(false)
+  status    SubmissionStatus @default(pending)
+
+  caption   String?
+  visibility Visibility      @default(private)
+
+  likesCount    Int @default(0)
+  commentsCount Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  userId   String
+  recipeId String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  comments      Comment[]
+  likes         Like[]
+  notifications Notification[]
+
+  @@index([visibility])
+  @@index([status])
+}
+
+//////////////////////////
+// 💬 COMENTÁRIOS
+//////////////////////////
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  userId       String
+  submissionId String
+
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submission RecipeSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+}
+
+//////////////////////////
+// ❤️ LIKES
+//////////////////////////
+
+model Like {
+  id           String @id @default(uuid())
+
+  userId       String
+  submissionId String
+
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submission RecipeSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, submissionId])
+}
