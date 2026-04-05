@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   submitRecipe,
-  getSubmission,
+  getSubmissions,
   getSubmissionById,
   updateSubmission,
   deleteSubmission

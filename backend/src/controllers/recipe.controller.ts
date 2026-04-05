@@ -1,16 +1,16 @@
 import type { Request, Response } from 'express';
-import prisma from '../services/prisma.service.js';
 import { body, validationResult } from 'express-validator';
+import { recipeService } from '../services/recipe.service.js';
+import { externalRecipeService } from '../services/external-recipe.service.js';
 
 export const createRecipe = [
   body('title').notEmpty().withMessage('Title is required'),
-  body('description').notEmpty().withMessage('Description is required'),
-  body('imageUrl').isURL().withMessage('Valid image URL is required'),
-  body('category').notEmpty().withMessage('Category is required'),
-  body('difficulty').isIn(['easy', 'medium', 'hard']).withMessage('Difficulty must be easy, medium, or hard'),
+  body('description').optional().isLength({ min: 1 }).withMessage('Description cannot be empty'),
+  body('imageUrl').optional().isURL().withMessage('Valid image URL is required'),
+  body('category').optional().notEmpty().withMessage('Category cannot be empty'),
+  body('difficulty').optional().isIn(['easy', 'medium', 'hard']).withMessage('Difficulty must be easy, medium, or hard'),
   body('ingredients').isArray({ min: 1 }).withMessage('At least one ingredient is required'),
   body('ingredients.*.name').notEmpty().withMessage('Ingredient name is required'),
-  body('ingredients.*.quantity').notEmpty().withMessage('Ingredient quantity is required'),
   body('steps').isArray({ min: 1 }).withMessage('At least one step is required'),
   body('steps.*.content').notEmpty().withMessage('Step content is required'),
   async (req: Request, res: Response) => {
@@ -23,103 +23,66 @@ export const createRecipe = [
       const userId = String(req.user?.id ?? '');
       const { title, description, imageUrl, category, difficulty, ingredients, steps } = req.body;
 
-      const recipe = await prisma.recipe.create({
-        data: {
-          title,
-          description,
-          imageUrl,
-          category,
-          difficulty,
-          source: 'user',
-          userId,
-          ingredients: {
-            create: ingredients.map((ing: any) => ({
-              name: String(ing.name),
-              quantity: String(ing.quantity)
-            })),
-          },
-          steps: {
-            create: steps.map((step: any, index: number) => ({
-              order: index + 1,
-              content: String(step.content)
-            })),
-          },
-        },
-        include: { ingredients: true, steps: true, user: true }
-      });
+      const recipe = await recipeService.createRecipe(
+        userId,
+        title,
+        description,
+        imageUrl,
+        category,
+        difficulty,
+        ingredients,
+        steps
+      );
+
       res.status(201).json(recipe);
     } catch (error) {
-      res.status(500).json({ error: 'Internal server error' });
+      const message = error instanceof Error ? error.message : 'Failed to create recipe';
+      res.status(400).json({ error: message });
     }
   }
 ];
 
 export const getRecipes = async (req: Request, res: Response) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const category = req.query.category as string;
-    const difficulty = req.query.difficulty as string;
-    const search = req.query.search as string;
-    const userId = req.query.userId as string;
+    const page = parseInt(String(req.query.page ?? '1'), 10) || 1;
+    const limit = parseInt(String(req.query.limit ?? '10'), 10) || 10;
+    const userId = req.query.userId ? String(req.query.userId) : undefined;
 
-    const where: any = {};
-    if (category) where.category = category;
-    if (difficulty) where.difficulty = difficulty;
-    if (userId) where.userId = userId;
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { category: { contains: search, mode: 'insensitive' } }
-      ];
-    }
-
-    const recipes = await prisma.recipe.findMany({
-      where,
-      include: {
-        ingredients: true,
-        steps: true,
-        user: { select: { id: true, name: true, avatar: true } },
-        _count: { select: { submissions: true } }
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: { createdAt: 'desc' }
-    });
-
-    const total = await prisma.recipe.count({ where });
+    const { recipes, total, pages } = await recipeService.getRecipes(page, limit, userId);
 
     res.json({
       recipes,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      }
+      pagination: { page, limit, total, pages }
     });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
+export const searchRecipes = async (req: Request, res: Response) => {
+  try {
+    const query = req.query.q ? String(req.query.q) : '';
+
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    const recipes = await externalRecipeService.searchRecipes(query);
+    res.json({ recipes });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Search failed';
+    res.status(500).json({ error: message });
+  }
+};
+
 export const getRecipeById = async (req: Request, res: Response) => {
   try {
     const recipeId = String(req.params.recipeId);
-    const recipe = await prisma.recipe.findUnique({
-      where: { id: recipeId },
-      include: {
-        ingredients: true,
-        steps: { orderBy: { order: 'asc' } },
-        user: { select: { id: true, name: true, avatar: true } },
-        _count: { select: { submissions: true } }
-      },
-    });
-    if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
+    const recipe = await recipeService.getRecipeById(recipeId);
     res.json(recipe);
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(error instanceof Error && error.message.includes('not found') ? 404 : 500).json({ error: message });
   }
 };
 
@@ -130,10 +93,7 @@ export const updateRecipe = [
   body('category').optional().notEmpty().withMessage('Category cannot be empty'),
   body('difficulty').optional().isIn(['easy', 'medium', 'hard']).withMessage('Difficulty must be easy, medium, or hard'),
   body('ingredients').optional().isArray().withMessage('Ingredients must be an array'),
-  body('ingredients.*.name').optional().notEmpty().withMessage('Ingredient name cannot be empty'),
-  body('ingredients.*.quantity').optional().notEmpty().withMessage('Ingredient quantity cannot be empty'),
   body('steps').optional().isArray().withMessage('Steps must be an array'),
-  body('steps.*.content').optional().notEmpty().withMessage('Step content cannot be empty'),
   async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -143,55 +103,22 @@ export const updateRecipe = [
     try {
       const recipeId = String(req.params.recipeId);
       const userId = String(req.user?.id ?? '');
-      const updates = req.body;
+      const { title, description, imageUrl, category, difficulty, ingredients, steps } = req.body;
 
-      const recipe = await prisma.recipe.findUnique({
-        where: { id: recipeId },
-        include: { ingredients: true, steps: true }
-      });
-
-      if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
-      if (recipe.userId !== userId) return res.status(403).json({ error: 'Not authorized to update this recipe' });
-
-      // Update recipe
-      const updateData: any = {};
-      if (updates.title) updateData.title = updates.title;
-      if (updates.description) updateData.description = updates.description;
-      if (updates.imageUrl) updateData.imageUrl = updates.imageUrl;
-      if (updates.category) updateData.category = updates.category;
-      if (updates.difficulty) updateData.difficulty = updates.difficulty;
-
-      // Handle ingredients update
-      if (updates.ingredients) {
-        await prisma.ingredient.deleteMany({ where: { recipeId } });
-        updateData.ingredients = {
-          create: updates.ingredients.map((ing: any) => ({
-            name: String(ing.name),
-            quantity: String(ing.quantity)
-          }))
-        };
-      }
-
-      // Handle steps update
-      if (updates.steps) {
-        await prisma.step.deleteMany({ where: { recipeId } });
-        updateData.steps = {
-          create: updates.steps.map((step: any, index: number) => ({
-            order: index + 1,
-            content: String(step.content)
-          }))
-        };
-      }
-
-      const updatedRecipe = await prisma.recipe.update({
-        where: { id: recipeId },
-        data: updateData,
-        include: { ingredients: true, steps: true, user: true }
+      const updatedRecipe = await recipeService.updateRecipe(recipeId, userId, {
+        title,
+        description,
+        imageUrl,
+        category,
+        difficulty,
+        ingredients,
+        steps,
       });
 
       res.json(updatedRecipe);
     } catch (error) {
-      res.status(500).json({ error: 'Internal server error' });
+      const message = error instanceof Error ? error.message : 'Failed to update recipe';
+      res.status(error instanceof Error && message.includes('not authorized') ? 403 : 400).json({ error: message });
     }
   }
 ];
@@ -201,13 +128,10 @@ export const deleteRecipe = async (req: Request, res: Response) => {
     const recipeId = String(req.params.recipeId);
     const userId = String(req.user?.id ?? '');
 
-    const recipe = await prisma.recipe.findUnique({ where: { id: recipeId } });
-    if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
-    if (recipe.userId !== userId) return res.status(403).json({ error: 'Not authorized to delete this recipe' });
-
-    await prisma.recipe.delete({ where: { id: recipeId } });
-    res.json({ message: 'Recipe deleted successfully' });
+    const result = await recipeService.deleteRecipe(recipeId, userId);
+    res.json(result);
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    const message = error instanceof Error ? error.message : 'Failed to delete recipe';
+    res.status(error instanceof Error && message.includes('not authorized') ? 403 : 400).json({ error: message });
   }
 };

@@ -4,24 +4,27 @@ import {
   getUserById,
   getUsers,
   updateProfile,
-  deleteAccount,
   followUser,
-  unfollowUser
+  unfollowUser,
+  getFollowers,
+  getFollowing
 } from '../controllers/user.controller.js';
 import { authenticateToken } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
-// Public routes
-router.get('/', getUsers);
-router.get('/:userId', getUserById);
-
 // Protected routes
 router.get('/profile/me', authenticateToken, getProfile);
 router.put('/profile/me', authenticateToken, updateProfile);
-router.delete('/profile/me', authenticateToken, deleteAccount);
 
-router.post('/follow/:targetId', authenticateToken, followUser);
-router.delete('/follow/:targetId', authenticateToken, unfollowUser);
+// Follow operations
+router.post('/:userId/follow', authenticateToken, followUser);
+router.delete('/:userId/follow', authenticateToken, unfollowUser);
+router.get('/:userId/followers', getFollowers);
+router.get('/:userId/following', getFollowing);
+
+// Public routes
+router.get('/', getUsers);
+router.get('/:userId', getUserById);
 
 export default router;

@@ -4,13 +4,15 @@ import {
   getRecipes,
   getRecipeById,
   updateRecipe,
-  deleteRecipe
+  deleteRecipe,
+  searchRecipes
 } from '../controllers/recipe.controller.js';
 import { authenticateToken } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
 // Public routes
+router.get('/search', searchRecipes);
 router.get('/', getRecipes);
 router.get('/:recipeId', getRecipeById);
 
