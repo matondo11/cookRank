@@ -20,7 +20,7 @@
     "declarationMap": true,
     "experimentalDecorators":true,
     "emitDecoratorMetadata": true,
-    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     // Stricter Typechecking Options
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -40,7 +40,14 @@
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
-    "skipLibCheck": true,
-    "noEmit":true,
+    "skipLibCheck": true
+  },
+  "ts-node": {
+    "esm": true,
+    "experimentalEsm": true,
+    "moduleResolution": "nodenext",
+    "compilerOptions": {
+      "module": "esnext"
+    }
   }
 }
