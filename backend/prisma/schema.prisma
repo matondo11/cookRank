@@ -61,6 +61,11 @@ model User {
   followersCount Int @default(0)
   followingCount Int @default(0)
 
+  // 🎮 GAMIFICAÇÃO
+  level       Int @default(1)
+  experience  Int @default(0)
+  badges      Badge[]
+
   // RELAÇÕES
   recipes        Recipe[]
   submissions    RecipeSubmission[]
@@ -248,4 +253,21 @@ model Like {
   submission RecipeSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
   @@unique([userId, submissionId])
+}
+
+//////////////////////////
+// 🏆 BADGES
+//////////////////////////
+
+model Badge {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  iconUrl     String?
+  unlockedAt  DateTime @default(now())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

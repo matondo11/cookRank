@@ -1,6 +1,5 @@
 import type{Request, Response } from "express";
-import { analyzeFood } from "../services/ai.service";
-
+import { analyzeFood } from "../services/ai.service.js";
 
 export const analyze = async (req: Request, res: Response) => {
   try {
