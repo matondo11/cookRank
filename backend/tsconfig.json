@@ -20,6 +20,7 @@
     "declarationMap": true,
     "experimentalDecorators":true,
     "emitDecoratorMetadata": true,
+    "allowImportingTsExtensions": true,
     // Stricter Typechecking Options
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -40,5 +41,6 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
+    "noEmit":true,
   }
 }

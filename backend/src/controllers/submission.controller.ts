@@ -56,12 +56,72 @@ export const submitRecipe = async (req: Request, res: Response) => {
   }
 };
 
-export const getSubmissions = async (req: Request, res: Response) => {
+export const getSubmissionById = async (req: Request, res: Response) => {
   try {
-    const submissions = await prisma.recipeSubmission.findMany({
-      include: { user: true, recipe: true, comments: true, likes: true },
+    const { submissionId } = req.params;
+    const submission = await prisma.recipeSubmission.findUnique({
+      where: { id: submissionId },
+      include: {
+        user: { select: { id: true, name: true, avatar: true } },
+        recipe: true,
+        comments: {
+          include: { user: { select: { id: true, name: true, avatar: true } } },
+          orderBy: { createdAt: 'asc' }
+        },
+        likes: { include: { user: { select: { id: true, name: true } } } },
+        _count: { select: { comments: true, likes: true } }
+      },
     });
-    res.json(submissions);
+    if (!submission) return res.status(404).json({ error: 'Submission not found' });
+    res.json(submission);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const updateSubmission = async (req: Request, res: Response) => {
+  try {
+    const { submissionId } = req.params;
+    const userId = String(req.user?.id ?? '');
+    const { caption, visibility } = req.body;
+
+    const submission = await prisma.recipeSubmission.findUnique({
+      where: { id: submissionId }
+    });
+
+    if (!submission) return res.status(404).json({ error: 'Submission not found' });
+    if (submission.userId !== userId) return res.status(403).json({ error: 'Not authorized to update this submission' });
+
+    const updateData: any = {};
+    if (caption !== undefined) updateData.caption = caption;
+    if (visibility) updateData.visibility = visibility;
+
+    const updatedSubmission = await prisma.recipeSubmission.update({
+      where: { id: submissionId },
+      data: updateData,
+      include: { user: true, recipe: true }
+    });
+
+    res.json(updatedSubmission);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const deleteSubmission = async (req: Request, res: Response) => {
+  try {
+    const { submissionId } = req.params;
+    const userId = String(req.user?.id ?? '');
+
+    const submission = await prisma.recipeSubmission.findUnique({
+      where: { id: submissionId }
+    });
+
+    if (!submission) return res.status(404).json({ error: 'Submission not found' });
+    if (submission.userId !== userId) return res.status(403).json({ error: 'Not authorized to delete this submission' });
+
+    await prisma.recipeSubmission.delete({ where: { id: submissionId } });
+    res.json({ message: 'Submission deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }

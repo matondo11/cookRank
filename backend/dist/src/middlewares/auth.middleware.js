@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
-export const authenticateToken = (req, res, next) => {
+export const authenticate = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     if (!token) {
@@ -14,4 +14,7 @@ export const authenticateToken = (req, res, next) => {
         next();
     });
 };
+// Keep backward compatibility
+export const authenticateToken = authenticate;
+;
 //# sourceMappingURL=auth.middleware.js.map

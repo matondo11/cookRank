@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 
-export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+export const authenticate = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -19,3 +19,6 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
     next();
   });
 };
+
+// Keep backward compatibility
+export const authenticateToken = authenticate;

@@ -1,8 +1,13 @@
 import { Router } from 'express';
-import { submitRecipe, getSubmissions } from '../controllers/submission.controller.js';
+import { submitRecipe, getSubmissions, getSubmissionById, updateSubmission, deleteSubmission } from '../controllers/submission.controller.js';
 import { authenticateToken } from '../middlewares/auth.middleware.js';
 const router = Router();
-router.post('/', authenticateToken, submitRecipe);
+// Public routes
 router.get('/', getSubmissions);
+router.get('/:submissionId', getSubmissionById);
+// Protected routes
+router.post('/', authenticateToken, submitRecipe);
+router.put('/:submissionId', authenticateToken, updateSubmission);
+router.delete('/:submissionId', authenticateToken, deleteSubmission);
 export default router;
 //# sourceMappingURL=submission.routes.js.map
