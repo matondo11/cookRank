@@ -26,6 +26,13 @@ export const colors = {
 
     border: '#E5E5E5',
     skeleton: '#E1E9EE',
+
+    subText: '#666666',
+    surface: '#FFFFFF',
+    error: '#FF4444',
+    success: '#4CAF50',
+    warning: '#FF9800',
+    info: '#2196F3',
   },
 
   dark: {
@@ -45,6 +52,13 @@ export const colors = {
 
     border: '#2A2A2A',
     skeleton: '#2A2A2A',
+
+    subText: '#B0B0B0',
+    surface: '#1E1E1E',
+    error: '#FF4444',
+    success: '#4CAF50',
+    warning: '#FF9800',
+    info: '#2196F3',
   },
 };
 
